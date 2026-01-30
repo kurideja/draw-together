@@ -47,8 +47,8 @@ export async function GET() {
             continue;
           }
 
-          for (const { messages } of results) {
-            for (const msg of messages) {
+          for (const result of results as Array<{ name: string; messages: Array<{ id: string; message: Record<string, string> }> }>) {
+            for (const msg of result.messages) {
               lastId = msg.id;
               const { x, y, color } = msg.message as { x: string; y: string; color: string };
               if (!send(JSON.stringify({ x: Number(x), y: Number(y), color }))) {

@@ -122,7 +122,7 @@ export default function Page() {
     });
   }, [grid]);
 
-  const paintCell = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const paintCell = (clientX: number, clientY: number) => {
     if (!myColor || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
 
     const canvas = canvasRef.current;
@@ -130,8 +130,8 @@ export default function Page() {
 
     const rect = canvas.getBoundingClientRect();
     // Calculate relative position (0-1) then multiply by grid size
-    const x = Math.floor(((e.clientX - rect.left) / rect.width) * 50);
-    const y = Math.floor(((e.clientY - rect.top) / rect.height) * 50);
+    const x = Math.floor(((clientX - rect.left) / rect.width) * 50);
+    const y = Math.floor(((clientY - rect.top) / rect.height) * 50);
 
     if (x >= 0 && x < 50 && y >= 0 && y < 50) {
       // Optimistically update local grid
@@ -151,14 +151,14 @@ export default function Page() {
     }
   };
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseDown: React.MouseEventHandler<HTMLCanvasElement> = (e) => {
     setIsMouseDown(true);
-    paintCell(e);
+    paintCell(e.clientX, e.clientY);
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseMove: React.MouseEventHandler<HTMLCanvasElement> = (e) => {
     if (isMouseDown) {
-      paintCell(e);
+      paintCell(e.clientX, e.clientY);
     }
   };
 
@@ -204,20 +204,15 @@ export default function Page() {
           onTouchStart={(e) => {
             e.preventDefault();
             const touch = e.touches[0];
-            const mouseEvent = new MouseEvent('mousedown', {
-              clientX: touch.clientX,
-              clientY: touch.clientY,
-            });
-            handleMouseDown(mouseEvent as any);
+            paintCell(touch.clientX, touch.clientY);
+            setIsMouseDown(true);
           }}
           onTouchMove={(e) => {
             e.preventDefault();
-            const touch = e.touches[0];
-            const mouseEvent = new MouseEvent('mousemove', {
-              clientX: touch.clientX,
-              clientY: touch.clientY,
-            });
-            handleMouseMove(mouseEvent as any);
+            if (isMouseDown) {
+              const touch = e.touches[0];
+              paintCell(touch.clientX, touch.clientY);
+            }
           }}
           onTouchEnd={(e) => {
             e.preventDefault();
