@@ -1,23 +1,22 @@
-import { createClient } from "redis";
+import { createRedisClient } from "@/lib/redis";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const redis = createClient({ url: process.env.REDIS_URL ?? "redis://localhost:6379" });
-  await redis.connect();
+  const redis = await createRedisClient();
 
-  const streamKey = "animals";
+  const streamKey = "grid-updates";
+  const gridKey = "grid-state";
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
     async start(controller) {
       let closed = false;
 
-      const send = (data: string, id?: string) => {
+      const send = (data: string) => {
         if (closed) return false;
         try {
-          const message = `${id ? `id: ${id}\n` : ""}data: ${data}\n\n`;
-          controller.enqueue(encoder.encode(message));
+          controller.enqueue(encoder.encode(`data: ${data}\n\n`));
           return true;
         } catch {
           closed = true;
@@ -26,19 +25,16 @@ export async function GET() {
       };
 
       try {
-        // Send connection confirmation
         if (!send("connected")) return;
 
-        // Send all historical messages
-        const history = await redis.xRange(streamKey, "-", "+");
-        
-        for (const msg of history) {
-          if (!send(JSON.stringify({ id: msg.id, ...msg.message }), msg.id)) {
-            return;
-          }
+        // Send current grid state (load from Redis hash)
+        const gridData = await redis.hGetAll(gridKey);
+        for (const [key, color] of Object.entries(gridData)) {
+          const [x, y] = key.split(",").map(Number);
+          if (!send(JSON.stringify({ x, y, color }))) return;
         }
 
-        // Stream new messages in real-time
+        // Stream new updates in real-time
         let lastId = "$";
         while (!closed) {
           const results = await redis.xRead(
@@ -54,14 +50,15 @@ export async function GET() {
           for (const { messages } of results) {
             for (const msg of messages) {
               lastId = msg.id;
-              if (!send(JSON.stringify({ id: msg.id, ...msg.message }), msg.id)) {
+              const { x, y, color } = msg.message as { x: string; y: string; color: string };
+              if (!send(JSON.stringify({ x: Number(x), y: Number(y), color }))) {
                 return;
               }
             }
           }
         }
       } catch (error) {
-        console.error("Stream error:", error);
+        console.error("Grid stream error:", error);
       } finally {
         closed = true;
         try {
@@ -72,7 +69,7 @@ export async function GET() {
     },
 
     cancel() {
-      console.log("Client disconnected");
+      console.log("Grid client disconnected");
     },
   });
 
