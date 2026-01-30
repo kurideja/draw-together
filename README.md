@@ -29,3 +29,6 @@ ifconfig | grep "inet " | grep -v 127.0.0.1
 
 Share `<YOUR_IP>:3000` with your peers. This app works on mobile devices and personal computers that are one the same Wi-Fi.
 
+
+![screenshot](./screenshot.png)
+
